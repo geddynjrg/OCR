@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    #output {
+      margin-top: 20px;
+    }
+
+    #output img {
+      width: 300px;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+
+    #words {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Character Recognition and Word Extraction</h1>
+  
+  <input type="file" id="inputImage" accept="image/*">
+  <div id="output"></div>
+  <div id="words"></div>
+
+  <script async src="https://docs.opencv.org/master/opencv.js" onload="initialize()"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.2/dist/tesseract.min.js" onload="initializeTesseract()"></script>
+  <script>
+    function initialize() {
+      const inputImage = document.getElementById('inputImage');
+      const outputDiv = document.getElementById('output');
+
+      inputImage.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(readerEvent) {
+          const image = new Image();
+          image.onload = function() {
+            processImage(image);
+          };
+          image.src = readerEvent.target.result;
+        };
+
+        reader.readAsDataURL(file);
+      });
+
+      function processImage(image) {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+
+        const context = canvas.getContext('2d');
+        context.drawImage(image, 0, 0);
+
+        const src = cv.imread(canvas);
+        const dst = new cv.Mat();
+        cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+        cv.threshold(src, dst, 127, 255, cv.THRESH_BINARY);
+        cv.imshow(canvas, dst);
+
+        const outputImage = new Image();
+        outputImage.src = canvas.toDataURL();
+        outputDiv.innerHTML = '';
+        outputDiv.appendChild(outputImage);
+
+        src.delete();
+        dst.delete();
+      }
+    }
+
+    async function initializeTesseract() {
+      const inputImage = document.getElementById('inputImage');
+      const wordsDiv = document.getElementById('words');
+
+      const recognizeWords = async (imageData) => {
+        const worker = Tesseract.createWorker();
+
+        await worker.load();
+        await worker.loadLanguage('eng');
+        await worker.initialize('eng');
+
+        const { data: { text } } = await worker.recognize(imageData);
+        const words = text.replace(/\n/g, ' ').split(/\s+/).filter(word => word.trim() !== '');
+
+        wordsDiv.innerHTML = '';
+        for (const word of words) {
+          const wordElement = document.createElement('span');
+          wordElement.textContent = word + ' ';
+          wordsDiv.appendChild(wordElement);
+        }
+
+        await worker.terminate();
+      };
+
+      inputImage.addEventListener('change', async function(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+
+        reader.onload = async function(readerEvent) {
+          const imageData = new Uint8Array(readerEvent.target.result);
+          await recognizeWords(imageData);
+        };
+
+        reader.readAsArrayBuffer(file);
+      });
+    }
+  </script>
+</body>
+</html>
